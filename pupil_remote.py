@@ -27,7 +27,7 @@ pub_port = pupil_remote.recv_string()
 # Assumes `sub_port` to be set to the current subscription port
 subscriber = ctx.socket(zmq.SUB)
 subscriber.connect(f'tcp://{ip}:{sub_port}')
-subscriber.subscribe('gaze.')  # receive all gaze messages
+subscriber.subscribe('surfaces.')  # receive all gaze messages
 
 # ------------------socket.io server--------------------------
 import socketio
@@ -37,27 +37,42 @@ sio = socketio.AsyncServer(async_mode='aiohttp', cors_allowed_origins='*')
 app = web.Application()
 sio.attach(app)
 
+connected = False
+sendGazeData = True
+
 #define events
 @sio.event
-def connect(sid, environ, auth): #invoked automatically when a client connects to the server
+def connect(sid, environ, auth):
+    global connected
+    connected = True
     print('connection established')
 
-sendGazeData = True
+@sio.event
+def connect_error(data):
+    global connected
+    connected = False
+    print('connection failed')
+
+@sio.event
+def disconnect(sid):
+    global connected
+    connected = False
+    stopSendingGazeData()
+    print('disconnected')
 
 @sio.on('startSendingGazeData')
 async def startSendingGazeData(sid):
   print("start sending gaze data")
   global sendGazeData
   sendGazeData = True
-  while sendGazeData:
+  while sendGazeData & connected:
     sleep(0.1)
     topic, payload = subscriber.recv_multipart()
     data = msgpack.loads(payload, raw=False)
-    # print(f"{message}") #[b'norm_pos'], message[b'gaze_point_3d']
     await sio.emit("gazeData", data)
 
 @sio.on('stopSendingGazeData')
-def stopSendingGazeData(sid):
+def stopSendingGazeData(sid=None):
    print("stop sending gaze data")
    global sendGazeData
    sendGazeData = False
