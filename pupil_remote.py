@@ -66,7 +66,6 @@ async def startSendingGazeData(sid):
   global sendGazeData
   sendGazeData = True
   while sendGazeData & connected:
-    sleep(0.1)
     topic, payload = subscriber.recv_multipart()
     data = msgpack.loads(payload, raw=False)
     await sio.emit("gazeData", data)
