@@ -1,5 +1,4 @@
 import asyncio
-
 import zmq
 import msgpack
 
@@ -89,11 +88,19 @@ def main():
                 topic, payload = msg_parts
                 data = msgpack.loads(payload, raw=False)
 
-                await sio.emit("gazeData", data)
+                # Extract only the necessary fields for the frontend
+                if 'gaze_on_surfaces' in data and len(data['gaze_on_surfaces']) > 0:
+                    gaze_surface = data['gaze_on_surfaces'][0]
+                    if gaze_surface['on_surf']:
+                        optimized_data = {
+                            'norm_pos': gaze_surface['norm_pos'],
+                            'name': data['name']
+                        }
+                        # Send only the optimized data to the frontend
+                        await sio.emit("gazeData", optimized_data)
+                        print("data: ", optimized_data)
             else:
                 print("Unexpected message format received")
-
-            await asyncio.sleep(1 / 60)  # Send at 60 Hz (adjust this as needed)
 
     @sio.on('stopSendingGazeData')
     def stopSendingGazeData(sid=None):
