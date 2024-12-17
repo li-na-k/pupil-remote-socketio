@@ -2,7 +2,7 @@ import asyncio
 import zmq
 import msgpack
 
-from pupil_labs.realtime_api.simple import discover_one_device, Device
+from pupil_labs.realtime_api.simple import Device
 from pupil_labs.real_time_screen_gaze.gaze_mapper import GazeMapper
 
 
@@ -94,54 +94,6 @@ def main():
     )
 
 
-
-    
-
-    # ctx = zmq.Context()
-    # pupil_remote = zmq.Socket(ctx, zmq.REQ)
-    # pupil_remote.connect('tcp://127.0.0.1:50020') #using default port (cf. Pupil Remote GUI)
-
-    # # ------------------ connect to ipc backbone ---------
-    # # The REQ talks to Pupil remote and receives the session unique IPC SUB PORT
-    # pupil_remote = ctx.socket(zmq.REQ)
-
-    # ip = 'localhost'  # If you talk to a different machine use its IP.
-    # port = 50020  # The port defaults to 50020. Set in Pupil Capture GUI.
-
-    # pupil_remote.connect(f'tcp://{ip}:{port}')
-
-    # # Request 'SUB_PORT' for reading data
-    # pupil_remote.send_string('SUB_PORT')
-    # sub_port = pupil_remote.recv_string()
-
-    # # Request 'PUB_PORT' for writing data
-    # pupil_remote.send_string('PUB_PORT')
-    # pub_port = pupil_remote.recv_string()
-    # pub_socket = zmq.Socket(ctx, zmq.PUB)
-    # pub_socket.connect("tcp://127.0.0.1:{}".format(pub_port))
-
-    # # Assumes `sub_port` to be set to the current subscription port
-    # subscriber = ctx.socket(zmq.SUB)
-    # subscriber.connect(f'tcp://{ip}:{sub_port}')
-    # subscriber.subscribe('surfaces.')  # receive all gaze messages
-
-    # # Start the annotations plugin
-    # notify(
-    #     pupil_remote,
-    #     {"subject": "start_plugin", "name": "Annotation_Capture", "args": {}},
-    # )
-
-    # # Start recording
-    # pupil_remote.send_string("R")
-    # pupil_remote.recv_string()
-    # time.sleep(1.0)  # sleep for a few seconds, can be less
-
-    # # Send annotation
-    # my_annotation = create_annotation("helloooo", 1.0, request_pupil_time(pupil_remote))
-    # my_annotation["current_condition"] = "Mix2"
-    # send_annotation(pub_socket, my_annotation)
-    # time.sleep(1.0)  # sleep for a few seconds, can be less
-
     # ------------------socket.io server--------------------------
     import socketio
     from aiohttp import web
@@ -180,30 +132,53 @@ def main():
 
             frame, gaze = device.receive_matched_scene_video_frame_and_gaze()
             result = gaze_mapper.process_frame(frame, gaze)
-            print(result.mapped_gaze)
-            # for surface_gaze in result.mapped_gaze[screen_surface_mainscreen.uid]:
-            #     printf(f"Gaze at {surface_gaze.x}, {surface_gaze.y}")
+            mapped_gaze = result.mapped_gaze
+            print(mapped_gaze)
+            for aoi_id, gaze_list in mapped_gaze.items():
+                for gaze_entry in gaze_list:
+                    if not gaze_entry.is_on_aoi:
+                        continue
 
-            msg_parts = gaze_sample
+                    if aoi_id == mainscreen.uid:
+                        screen_name = 'mainscreen'
+                    elif aoi_id == secondscreen.uid:
+                        screen_name = 'secondscreen'
+                    else:
+                        screen_name = 'unknown'
+                        continue
 
-            if len(msg_parts) == 2:
-                print(".............")
-                topic, payload = msg_parts
-                data = msgpack.loads(payload, raw=False)
+                    optimized_data = {
+                        'norm_pos': [gaze_entry.x, gaze_entry.y],
+                        'name': screen_name
+                    }
+                    #print(optimized_data)
+                    await sio.emit("gazeData", optimized_data)
+            
+            
 
-                # Extract only the necessary fields for the frontend
-                if 'gaze_on_surfaces' in data and len(data['gaze_on_surfaces']) > 0:
-                    gaze_surface = data['gaze_on_surfaces'][0]
-                    if gaze_surface['on_surf']:
-                        optimized_data = {
-                            'norm_pos': gaze_surface['norm_pos'],
-                            'name': data['name']
-                        }
-                        # Send only the optimized data to the frontend
-                        await sio.emit("gazeData", optimized_data)
-                        print("data: ", optimized_data)
-            else:
-                print("Unexpected message format received", msg_parts)
+            # if len(msg_parts) == 2:
+            #     print(".............")
+            #     topic, payload = msg_parts
+            #     data = msgpack.loads(payload, raw=False)
+
+
+            #     for surface_gaze in result.mapped_gaze[mainscreen.uid]:
+            #         print(f"Gaze at {surface_gaze.x}, {surface_gaze.y}")
+            #         msg_parts = [surface_gaze.x, surface_gaze.y]
+
+            #     # Extract only the necessary fields for the frontend
+            #     if 'gaze_on_surfaces' in data and len(data['gaze_on_surfaces']) > 0:
+            #         gaze_surface = data['gaze_on_surfaces'][0]
+            #         if gaze_surface['on_surf']:
+            #             optimized_data = {
+            #                 'norm_pos': gaze_surface['norm_pos'],
+            #                 'name': data['name']
+            #             }
+            #             # Send only the optimized data to the frontend
+            #             await sio.emit("gazeData", optimized_data)
+            #             print("data: ", optimized_data)
+            # else:
+            #     print("Unexpected message format received", msg_parts)
 
     @sio.on('stopSendingGazeData')
     def stopSendingGazeData(sid=None):
