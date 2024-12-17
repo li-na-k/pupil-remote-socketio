@@ -53,25 +53,25 @@ def main():
     }
 
     marker_verts_secondscreen = {
-    0: [ # marker id 0 (top left)
+    4: [ # marker id 0 (top left)
         (15, 15), # Top left marker corner
         (135, 15), # Top right
         (135, 135), # Bottom right
         (15, 135), # Bottom left
     ],
-    1: [ # marker id 1 (top right)
+    5: [ # marker id 1 (top right)
         (2425, 15), # Top left marker corner
         (2545, 15), # Top right
         (2545, 135), # Bottom right
         (2425, 135), # Bottom left
     ],
-    2: [ # marker id 2 (bottom right)
+    6: [ # marker id 2 (bottom right)
         (2425, 1205), # Top left marker corner
         (2545, 1205), # Top right
         (2545, 1325), # Bottom right
         (2425, 1325), # Bottom left
     ],
-    3: [ # marker id 0
+    7: [ # marker id 0
         (15, 1205), # Top left marker corner
         (135, 1205), # Top right
         (135, 1325), # Bottom right
