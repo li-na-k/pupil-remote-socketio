@@ -8,7 +8,7 @@ from pupil_labs.real_time_screen_gaze.gaze_mapper import GazeMapper
 
 def main():
     print("Pupil remote script started.")
-    ip = "192.168.0.111"
+    ip = "192.168.0.101"
 
     #get device
     global device
@@ -53,25 +53,25 @@ def main():
     }
 
     marker_verts_secondscreen = {
-    4: [ # marker id 0 (top left)
+    4: [ # marker id 4 (top left)
         (15, 15), # Top left marker corner
         (135, 15), # Top right
         (135, 135), # Bottom right
         (15, 135), # Bottom left
     ],
-    5: [ # marker id 1 (top right)
+    5: [ # marker id 5 (top right)
         (2425, 15), # Top left marker corner
         (2545, 15), # Top right
         (2545, 135), # Bottom right
         (2425, 135), # Bottom left
     ],
-    6: [ # marker id 2 (bottom right)
+    6: [ # marker id 6 (bottom right)
         (2425, 1205), # Top left marker corner
         (2545, 1205), # Top right
         (2545, 1325), # Bottom right
         (2425, 1325), # Bottom left
     ],
-    7: [ # marker id 0
+    7: [ # marker id 7 (bottom left)
         (15, 1205), # Top left marker corner
         (135, 1205), # Top right
         (135, 1325), # Bottom right
@@ -133,7 +133,7 @@ def main():
             frame, gaze = device.receive_matched_scene_video_frame_and_gaze()
             result = gaze_mapper.process_frame(frame, gaze)
             mapped_gaze = result.mapped_gaze
-            print(mapped_gaze)
+            #print(mapped_gaze)
             for aoi_id, gaze_list in mapped_gaze.items():
                 for gaze_entry in gaze_list:
                     if not gaze_entry.is_on_aoi:
