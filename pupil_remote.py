@@ -1,10 +1,15 @@
 import asyncio
+from collections import deque
+import time
 import zmq
 import msgpack
 
 from pupil_labs.realtime_api.simple import Device
 from pupil_labs.real_time_screen_gaze.gaze_mapper import GazeMapper
 
+sendGazeData  = False
+capture_task  = None
+process_task  = None
 
 def main():
     print("Pupil remote script started.")
@@ -13,12 +18,7 @@ def main():
     #get device
     global device
     device = Device(address=ip, port="8080")
-    #device = discover_one_device()
     print(f"Phone Battery Level: {device.battery_level_percent} %")
-    #get gaze data once for test
-    # scene_sample, gaze_sample = device.receive_matched_scene_video_frame_and_gaze()
-    # print("This sample contains the following data:\n")
-    # print(f"Gaze x and y coordinates: {gaze_sample.x}, {gaze_sample.y}\n")
 
     #get GazeMapper object
     calibration = device.get_calibration()
@@ -102,8 +102,6 @@ def main():
     app = web.Application()
     sio.attach(app)
 
-    sendGazeData = True
-
     #define events
     @sio.event
     def connect(sid, environ, auth):
@@ -116,45 +114,47 @@ def main():
         print('connection failed')
 
     @sio.event
-    def disconnect(sid):
-        stopSendingGazeData()
-        print('disconnected')
+    async def disconnect(sid):
+        await stopSendingGazeData()
+        print('client disconnected')
 
-    @sio.on('startSendingGazeData')
-    async def startSendingGazeData(sid):
-        print("Start sending gaze data")
-        global sendGazeData
-        sendGazeData = True
-        #loop = asyncio.get_event_loop()
+    frame_q = asyncio.Queue(maxsize=1)
 
+    async def capture_loop():
+        loop = asyncio.get_running_loop()
         while sendGazeData:
-            # msg_parts = await loop.run_in_executor(None, subscriber.recv_multipart)
+            fg = await loop.run_in_executor(None,
+                device.receive_matched_scene_video_frame_and_gaze)
+            try:
+                frame_q.get_nowait()
+            except asyncio.QueueEmpty:
+                pass
+            await frame_q.put(fg)
 
-            frame, gaze = device.receive_matched_scene_video_frame_and_gaze()
+    async def process_loop():
+        frame_cnt, lat_hist = 0, deque(maxlen=30)
+        while sendGazeData:
+            frame, gaze = await frame_q.get()
+
+            # t0 = time.perf_counter()
             result = gaze_mapper.process_frame(frame, gaze)
-            mapped_gaze = result.mapped_gaze
-            #print(mapped_gaze)
-            for aoi_id, gaze_list in mapped_gaze.items():
-                for gaze_entry in gaze_list:
-                    if not gaze_entry.is_on_aoi:
-                        continue
 
-                    if aoi_id == mainscreen.uid:
-                        screen_name = 'mainscreen'
-                    elif aoi_id == secondscreen.uid:
-                        screen_name = 'secondscreen'
+            batch = []
+
+            for surf_id, lst in result.mapped_gaze.items():
+                for g in lst:
+                    if not g.is_on_aoi:
+                        continue
+                    if surf_id == mainscreen.uid:
+                        screen = "mainscreen"
+                    elif surf_id == secondscreen.uid:
+                        screen = "secondscreen"
                     else:
-                        screen_name = 'unknown'
                         continue
+                    batch.append({"norm_pos": [g.x, g.y], "name": screen})
 
-                    optimized_data = {
-                        'norm_pos': [gaze_entry.x, gaze_entry.y],
-                        'name': screen_name
-                    }
-                    #print(optimized_data)
-                    await sio.emit("gazeData", optimized_data)
-            
-            
+            if batch:
+                await sio.emit("gazeData", batch)
 
             # if len(msg_parts) == 2:
             #     print(".............")
@@ -179,12 +179,36 @@ def main():
             #             print("data: ", optimized_data)
             # else:
             #     print("Unexpected message format received", msg_parts)
+            # lat_hist.append((time.perf_counter() - t0) * 1000)
+            # frame_cnt += 1
+            # if frame_cnt % 30 == 0:
+            #     print(batch)   
+            #     print(f"Ø proc-lat last 30: {sum(lat_hist)/len(lat_hist):4.1f} ms")
+
+    @sio.on('startSendingGazeData')
+    async def startSendingGazeData(sid):
+        global sendGazeData, capture_task, process_task
+        if sendGazeData:
+            print("Sending gaze data was already running...")
+            return
+        sendGazeData = True
+        capture_task = asyncio.create_task(capture_loop())
+        process_task = asyncio.create_task(process_loop())
+        print("Start sending gaze data")
+  
 
     @sio.on('stopSendingGazeData')
-    def stopSendingGazeData(sid=None):
+    async def stopSendingGazeData(sid=None):
+        global sendGazeData, capture_task, process_task
+        if not sendGazeData:
+            return
         print("stop sending gaze data")
-        global sendGazeData
         sendGazeData = False
+        for t in (capture_task, process_task):
+            if t:
+                t.cancel()
+        await asyncio.gather(capture_task, process_task, return_exceptions=True)
+        capture_task = process_task = None
     
     # def annotateTrialData(trialData):
     #     print("new trial", trialData)
