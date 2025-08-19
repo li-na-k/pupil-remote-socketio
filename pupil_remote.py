@@ -13,7 +13,7 @@ process_task  = None
 
 def main():
     print("Pupil remote script started.")
-    ip = "192.168.0.101"
+    ip = "192.168.137.183"
 
     #get device
     global device
@@ -79,8 +79,8 @@ def main():
     ],
     }
 
-    screen_size_mainscreen = (1920, 1073) #right (DELL)
-    screen_size_secondscreen = (2560, 1342) #left (ROG)
+    screen_size_mainscreen = (1920, 1200) #right (DELL Laptop)
+    screen_size_secondscreen = (1920, 1065) #left (DELL Monitor)
 
 
     mainscreen = gaze_mapper.add_surface(
