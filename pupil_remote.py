@@ -25,62 +25,54 @@ def main():
     gaze_mapper = GazeMapper(calibration)
     
     #specify april tags
+    # ------------------ AprilTag layout params ------------------
+    TAG = 100        # tag side length in SURFACE (UI) pixels
+    M   = 15        # margin from each edge
+
+    # Use the UI coordinate space (logical CSS pixels) for each surface
+    screen_size_mainscreen   = (1365, 853)   # laptop (3072x1920 @ 225% -> ~1365x853 CSS px)
+    screen_size_secondscreen = (1920, 1200)  # external monitor @ 100%
+
+    W1, H1 = screen_size_mainscreen
+    W2, H2 = screen_size_secondscreen
+
+    # Corner helpers (clockwise: TL -> TR -> BR -> BL)
+    def tl(x0, y0, s=TAG):
+        return [(x0, y0), (x0+s, y0), (x0+s, y0+s), (x0, y0+s)]
+    def tr(w, y0, s=TAG, m=M):
+        return [(w-m-s, y0), (w-m, y0), (w-m, y0+s), (w-m-s, y0+s)]
+    def br(w, h, s=TAG, m=M):
+        return [(w-m-s, h-m-s), (w-m, h-m-s), (w-m, h-m), (w-m-s, h-m)]
+    def bl(x0, h, s=TAG, m=M):
+        return [(x0, h-m-s), (x0+s, h-m-s), (x0+s, h-m), (x0, h-m)]
+    # Mid-edges (top-center & bottom-center), same clockwise order
+    def tc(w, s=TAG, m=M):
+        x0 = (w - s) // 2
+        return [(x0, m), (x0 + s, m), (x0 + s, m + s), (x0, m + s)]
+    def bc(w, h, s=TAG, m=M):
+        x0 = (w - s) // 2
+        y0 = h - m - s
+        return [(x0, y0), (x0 + s, y0), (x0 + s, y0 + s), (x0, y0 + s)]
+
+    # ---------- MAIN SCREEN (IDs 0..3 corners + 8,10 mid-edges) ----------
     marker_verts_mainscreen = {
-    0: [ # marker id 0 (top left)
-        (15, 15), # Top left marker corner
-        (135, 15), # Top right
-        (135, 135), # Bottom right
-        (15, 135), # Bottom left
-    ],
-    1: [ # marker id 1 (top right)
-        (1785, 15), # Top left marker corner
-        (1905, 15), # Top right
-        (1905, 135), # Bottom right
-        (1785, 135), # Bottom left
-    ],
-    2: [ # marker id 2 (bottom right)
-        (1785, 935), # Top left marker corner
-        (1905, 935), # Top right
-        (1905, 1055), # Bottom right
-        (1785, 1055), # Bottom left
-    ],
-    3: [ # marker id 3 (bottom left)
-        (15, 935), # Top left marker corner
-        (135, 935), # Top right
-        (135, 1055), # Bottom right
-        (15, 1055), # Bottom left
-    ]
+        0:  tl(M, M),           # top-left
+        1:  tr(W1, M),          # top-right
+        2:  br(W1, H1),         # bottom-right
+        3:  bl(M, H1),          # bottom-left
+        8:  tc(W1),             # top-center
+        9: bc(W1, H1),         # bottom-center
     }
 
+    # ---------- SECOND SCREEN (IDs 4..7 corners + 12,14 mid-edges) ----------
     marker_verts_secondscreen = {
-    4: [ # marker id 4 (top left)
-        (15, 15), # Top left marker corner
-        (135, 15), # Top right
-        (135, 135), # Bottom right
-        (15, 135), # Bottom left
-    ],
-    5: [ # marker id 5 (top right)
-        (2425, 15), # Top left marker corner
-        (2545, 15), # Top right
-        (2545, 135), # Bottom right
-        (2425, 135), # Bottom left
-    ],
-    6: [ # marker id 6 (bottom right)
-        (2425, 1205), # Top left marker corner
-        (2545, 1205), # Top right
-        (2545, 1325), # Bottom right
-        (2425, 1325), # Bottom left
-    ],
-    7: [ # marker id 7 (bottom left)
-        (15, 1205), # Top left marker corner
-        (135, 1205), # Top right
-        (135, 1325), # Bottom right
-        (15, 1325), # Bottom left
-    ],
+        4:  tl(M, M),           # top-left
+        5:  tr(W2, M),          # top-right
+        6:  br(W2, H2),         # bottom-right
+        7:  bl(M, H2),          # bottom-left
+        10: tc(W2),             # top-center
+        11: bc(W2, H2),         # bottom-center
     }
-
-    screen_size_mainscreen = (1920, 1200) #right (DELL Laptop)
-    screen_size_secondscreen = (1920, 1065) #left (DELL Monitor)
 
 
     mainscreen = gaze_mapper.add_surface(
