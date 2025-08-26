@@ -10,21 +10,23 @@ from pupil_labs.real_time_screen_gaze.gaze_mapper import GazeMapper
 sendGazeData  = False
 capture_task  = None
 process_task  = None
+connected     = False   # used by connect_error
 
 def main():
     print("Pupil remote script started.")
     ip = "192.168.137.183"
 
-    #get device
+    # get device
     global device
     device = Device(address=ip, port="8080")
     print(f"Phone Battery Level: {device.battery_level_percent} %")
 
-    #get GazeMapper object
+    # get GazeMapper object
+    errors = device.get_errors()
+    print("[Device errors]", errors)
     calibration = device.get_calibration()
     gaze_mapper = GazeMapper(calibration)
     
-    #specify april tags
     # ------------------ AprilTag layout params ------------------
     TAG = 100        # tag side length in SURFACE (UI) pixels
     M   = 15        # margin from each edge
@@ -85,8 +87,7 @@ def main():
         screen_size_secondscreen
     )
 
-
-    # ------------------socket.io server--------------------------
+    # ------------------ socket.io server --------------------------
     import socketio
     from aiohttp import web
 
@@ -94,7 +95,7 @@ def main():
     app = web.Application()
     sio.attach(app)
 
-    #define events
+    # define events
     @sio.event
     def connect(sid, environ, auth):
         print('connection established')
@@ -148,29 +149,6 @@ def main():
             if batch:
                 await sio.emit("gazeData", batch)
 
-            # if len(msg_parts) == 2:
-            #     print(".............")
-            #     topic, payload = msg_parts
-            #     data = msgpack.loads(payload, raw=False)
-
-
-            #     for surface_gaze in result.mapped_gaze[mainscreen.uid]:
-            #         print(f"Gaze at {surface_gaze.x}, {surface_gaze.y}")
-            #         msg_parts = [surface_gaze.x, surface_gaze.y]
-
-            #     # Extract only the necessary fields for the frontend
-            #     if 'gaze_on_surfaces' in data and len(data['gaze_on_surfaces']) > 0:
-            #         gaze_surface = data['gaze_on_surfaces'][0]
-            #         if gaze_surface['on_surf']:
-            #             optimized_data = {
-            #                 'norm_pos': gaze_surface['norm_pos'],
-            #                 'name': data['name']
-            #             }
-            #             # Send only the optimized data to the frontend
-            #             await sio.emit("gazeData", optimized_data)
-            #             print("data: ", optimized_data)
-            # else:
-            #     print("Unexpected message format received", msg_parts)
             # lat_hist.append((time.perf_counter() - t0) * 1000)
             # frame_cnt += 1
             # if frame_cnt % 30 == 0:
@@ -202,31 +180,7 @@ def main():
         await asyncio.gather(capture_task, process_task, return_exceptions=True)
         capture_task = process_task = None
     
-    # def annotateTrialData(trialData):
-    #     print("new trial", trialData)
-    #     # Send annotation
-    #     my_annotation = create_annotation("newTrial", 1.0, request_pupil_time(pupil_remote))
-    #     my_annotation["current_condition"] = trialData
-    #     send_annotation(pub_socket, my_annotation)
-    #     time.sleep(1.0)  # sleep for a few seconds, can be less
-    # @sio.on('startTrial', annotateTrialData)
-
-    # convenience function
-    # def send_recv_notification(n):
-    #     pupil_remote.send_string(f"notify.{n['subject']}", flags=zmq.SNDMORE)
-    #     pupil_remote.send(msgpack.dumps(n))
-    #     return pupil_remote.recv_string()
-
-    # @sio.on('calibrate') 
-    # def calibrate(sid=None):
-    #     #set calibration method
-    #     n = {'subject':'calibration.Monitor', 'args':{}}
-    #     print(send_recv_notification(n))
-    #     pupil_remote.send_string('C') #activate calibration
-    #     print("calibration started")
-    #     print(pupil_remote.recv_string())
-
-    #execute aiohttp application
+    # execute aiohttp application
     if __name__ == '__main__':
         web.run_app(app)
 
